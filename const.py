@@ -24,6 +24,5 @@ import sys
 sys.modules[__name__] = Const()
 
 import const
-##########login url##########
 const.DATA_PATH = "/Users/hellobiek/Library/Application Support/CrossOver/Bottles/海通证券/drive_c/new_haitong/vipdoc/sh/lday/"
 const.DATA_DEST_PATH = "/Users/hellobiek/Desktop/data"
