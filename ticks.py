@@ -22,7 +22,7 @@ def signed2unsigned(value, b = 32):
 
 def int_overflow(val):
     maxint = 2147483647
-    if not -maxint-1 <= val <= maxint:
+    if not -maxint - 1 <= val <= maxint:
         val = (val + (maxint + 1)) % (2 * (maxint + 1)) - maxint - 1
     return val
 
@@ -129,75 +129,68 @@ def price_recursion(tmp_check_sum, tick_data_item, tmp_size, tic_detail_bytes, k
                 left, tic_detail_bytes = read4(tic_detail_bytes)
                 tick_data_item = struct.unpack('I', left)[0]
                 tmp_size = 32
-        #print("index:%d, sum:%d, %d ? %d" % (tmp_index, tmp_check_sum, int(klist[tmp_index][1], 16), tmp_check_sum))
     return klist[tmp_index][0], tick_data_item, tic_detail_bytes, tmp_size
                     
 def parse_tick_detail(td_bytes, tdm):
     ttd_list = list()
-    if tdm.count == 0: raise Exception("tic file parse failed, ticket file count is 0")
-    ttd = TickTradeDetail(tdm.dtime, tdm.price, tdm.volume, tdm.type >> 31)
+    ttd = TickTradeDetail(tdm.dtime, tdm.price, tdm.volume, unsigned_left_shitf(tdm.type, -15))
     ttd_list.append(ttd)
+    trade_buffer = td_bytes[0 : tdm.vol_offset]
+    volume_buffer = td_bytes[tdm.vol_offset : (tdm.vol_offset + tdm.vol_size)]
     #解析交易时间及价格信息
-    ttd_list = parse_tick_price(ttd_list, td_bytes, tdm)
+    ttd_list = parse_tick_price(ttd_list, trade_buffer, tdm)
     #解析成交量
-    volume_buffer = td_bytes[tdm.vol_offset:]
+    total_vol = 0
     for i in range(1, tdm.count):
         result_vol = 0
         byte_volume, volume_buffer = read1(volume_buffer)
         if byte_volume <= 252:
             result_vol = int(byte_volume)
-            #print("1resultVol:%s" % result_vol)
         elif byte_volume == 253:
             tmp_vol, volume_buffer = read1(volume_buffer)
             result_vol = int(tmp_vol) + int(byte_volume)
-            result_vol = signed2unsigned(result_vol, 8)
-            #print("2resultVol:%s" % result_vol)
+            result_vol = signed2unsigned(result_vol, 16)
         elif byte_volume == 254:
             tmp_vol, volume_buffer = read2(volume_buffer)
             result_vol = int(tmp_vol) + int(byte_volume)
-            #print("3resultVol:%s" % result_vol)
-        elif byte_volume == 255:
+        else:
             tmp_vol1, volume_buffer = read1(volume_buffer)
             tmp_vol2, volume_buffer = read2(volume_buffer)
             result_vol = int(0xFFFF * int(tmp_vol1) + int(tmp_vol2) + 0xFF)
-            #print("4resultVol:%s" % result_vol)
         ttd_list[i].volume = result_vol
+        total_vol += result_vol
         ttd_list[i].dtime = set_trade_time(ttd_list[i].dtime)
         ttd_list[i].price = ttd_list[i].price / 100
-
-    ttd_list[0].dtime = set_trade_time(ttd_list[0].dtime)
+    ttd_list[0].dtime = set_trade_time(-5)
     ttd_list[0].price = ttd_list[0].price / 100
+    total_vol += ttd_list[0].volume
     return ttd_list
 
 def set_trade_time(time_val):
-    result = 0x23A
-    if time_val >= 0 and time_val <= 0x78:
-        result += time_val
-    elif time_val <= 0xF0:
-        result = 0x294 + time_val
-    _hour = result/60 % 24
+    result = time_val + 570 if time_val <= 120 else time_val + 660
+    _hour = (result / 60) % 24
     _minute = result % 60
     return "%2d:%2d" % (_hour, _minute)
 
-def parse_tick_item(data):
+def parse_tick_item(data,code):
     tick_item_bytes = data[:20]
     tic_detail_bytes = data[20:]
-    (sdate_time, scount, svol_offset, svol_size, stype, sprice, svolume) = struct.unpack("<iHHHHii", tick_item_bytes)
-    stime = int.from_bytes(bytes(stype), byteorder='little')
-    tdm = TickDetailModel(sdate_time, stime, sprice, svolume, scount, stype, svol_offset, svol_size)
+    (sdate, scount, svol_offset, svol_size, stype, sprice, svolume) = struct.unpack("iHHHHii", tick_item_bytes)
+    stime = ctypes.c_uint8(stype).value
+    tdm = TickDetailModel(sdate, stime, sprice, svolume, scount, stype, svol_offset, svol_size)
     ttd_list = parse_tick_detail(tic_detail_bytes, tdm)
     for item in ttd_list:
-        print(item)
+        print(item.volume)
 
-def read_tick():
-    with open("20180703/20180703.tic", 'rb') as fobj:
+def read_tick(filename, code_id):
+    with open(filename, 'rb') as fobj:
         stockCount = struct.unpack('<h', fobj.read(2))[0]
         for idx in range(stockCount):
-            (market, code, date, t_size, unkown) = struct.unpack("B6siii", fobj.read(20))
+            (market, code, _, date, t_size, pre_close) = struct.unpack("B6s1siif", fobj.read(20))
             code = code.decode()
             raw_tick_data = fobj.read(t_size)
-            if code == "601318":
-                parse_tick_item(raw_tick_data)
+            if code == code_id:
+                parse_tick_item(raw_tick_data,code)
 
 if __name__ == "__main__":
-    read_tick()
+    read_tick("20180801/20180801.tic", "000001")

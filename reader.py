@@ -19,8 +19,7 @@ def stock_csv(file_source_path, name):
                 stock_vol = source_obj.read(4)
                 stock_reservation = source_obj.read(4)
                 # date,open,high,low,close,amount,vol,reservation
-                if not stock_date:
-                    break
+                if not stock_date: break
                 stock_date = struct.unpack("i", stock_date)     #4字节 如20091229
                 stock_open = struct.unpack("i", stock_open)     #开盘价*100
                 stock_high = struct.unpack("i", stock_high)     #最高价*100

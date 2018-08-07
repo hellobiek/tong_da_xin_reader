@@ -1,13 +1,14 @@
 # coding=utf-8
 class TickTradeDetail:
-    def __init__(self, ctime, price, volume, ctype):
+    def __init__(self, ctime, price, volume, ctype, deal = 0):
         self.dtime = ctime
         self.price = price
         self.volume = volume
         self.type = ctype
+        self.deal = deal
 
     def __repr__(self):
-        return "time:%s, price:%s, volume:%s, type:%s" % (self.dtime, self.price, self.volume, self.type)
+        return "time:%s, price:%s, volume:%s, type:%s, deal:%s" % (self.dtime, self.price, self.volume, self.type, self.deal)
 
 class TickDetailModel:
     def __init__(self, cdate, ctime, cprice, cvolume, ccount, ctype, cvol_offset, cvol_size):
